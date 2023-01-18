@@ -40,98 +40,98 @@ odoo.define("3mit_print_server.print_ticket", function (require) {
   	const ExtendReceiptScreen = (ReceiptScreen) =>
 	class extends ReceiptScreen {
 	  	mounted() {
-			super.mounted(...arguments);
-			$(".button.next", this.el).hide();
-		}
+				super.mounted(...arguments);
+				$(".button.next", this.el).hide();
+			}
 
 	  	_shouldCloseImmediately() {
-			const ret = super._shouldCloseImmediately();
-			if (ret != undefined) {
-			  	return ret;
+				const ret = super._shouldCloseImmediately();
+				if (ret != undefined) {
+				  	return ret;
+				}
+				var invoiced_finalized = this.currentOrder.is_to_invoice()
+				  ? this.currentOrder.finalized
+				  : true;
+				return (
+				  this.env.pos.config.iface_print_skip_screen && invoiced_finalized
+				);
 			}
-			var invoiced_finalized = this.currentOrder.is_to_invoice()
-			  ? this.currentOrder.finalized
-			  : true;
-			return (
-			  this.env.pos.config.iface_print_skip_screen && invoiced_finalized
-			);
-		}
 
 	  // devuelve data reportada por la impresora
 	  	async print_3mit(order) {
-			const json = this._3mit_prepare_json(order);
-			const printer_host = this.env.pos.config.printer_host;
+				const json = this._3mit_prepare_json(order);
+				const printer_host = this.env.pos.config.printer_host;
 
-			try {
-			  	const rs = await $.post({
-					url: `http://${printer_host}/api/imprimir/factura`,
-					data: JSON.stringify(json),
-					contentType: "application/json",
-					dataType: "json",
-					timeout: 20000, //20 segundos para imprimir
-			  	});
-			  	console.log("3mit_send_to_printer:", rs);
-			  	if (rs.status == "OK") {
-					return rs.data;
-			  	} else {
-					return rs.status + ":" + rs.message;
-			  	}
-			} catch (err) {
-			  	await this.showPopup("ErrorPopup", {
-					title: "Ticket Fiscal",
-					body: err.statusText,
-				});
-			  	console.log("3mit_send_to_printer: Error", err);
-			  	return err.statusText;
-			}
+				try {
+				  	const rs = await $.post({
+						url: `http://${printer_host}/api/imprimir/factura`,
+						data: JSON.stringify(json),
+						contentType: "application/json",
+						dataType: "json",
+						timeout: 20000, //20 segundos para imprimir
+				  	});
+				  	console.log("3mit_send_to_printer:", rs);
+				  	if (rs.status == "OK") {
+						return rs.data;
+				  	} else {
+						return rs.status + ":" + rs.message;
+				  	}
+				} catch (err) {
+				  	await this.showPopup("ErrorPopup", {
+						title: "Ticket Fiscal",
+						body: err.statusText,
+					});
+				  	console.log("3mit_send_to_printer: Error", err);
+				  	return err.statusText;
+				}
 	  	}
 
 	  	_3mit_prepare_json(order) {
-			var json = order.export_for_printing();
-			if (!json.client) json.client = {};
-			var receipt = {
-		  		backendRef: json.name || null,
-		  		idFiscal:json.client.vat ||
-		  			//            json.client.rif ||
-					json.client.identification_id ||
-					null,
-		  		razonSocial: json.client.name || null,
-		  		direccion: json.client.street || null,
-		  		telefono: json.client.phone || null,
-			};
-		// items-products/
-			receipt.items = json.orderlines.map((r) => {
-			  	return {
-					nombre: r.product_name,
-					cantidad: r.quantity,
-					precio: r.price * order.rate_order,
-					impuesto: r.iva_rate,
-					descuento: r.discount,
-					tipoDescuento: "p",
-			  	};
-			});
+				var json = order.export_for_printing();
+				if (!json.client) json.client = {};
+				var receipt = {
+			  		backendRef: json.name || null,
+			  		idFiscal:json.client.vat ||
+			  			//            json.client.rif ||
+						json.client.identification_id ||
+						null,
+			  		razonSocial: json.client.name || null,
+			  		direccion: json.client.street || null,
+			  		telefono: json.client.phone || null,
+				};
+			// items-products/
+				receipt.items = json.orderlines.map((r) => {
+				  	return {
+						nombre: r.product_name,
+						cantidad: r.quantity,
+						precio: r.price * order.rate_order,
+						impuesto: r.iva_rate,
+						descuento: r.discount,
+						tipoDescuento: "p",
+				  	};
+				});
 
-			const bi_igtf = order.bi_igtf || 0;
-			receipt.pagos = [];
-			// consolida por código en la impresora
-			const pagos = json.paymentlines.map((r) => {
-			  return {
-				codigo: r.fiscal_print_code || (r.dolar_active ? "20" : "01"),
-				nombre: r.fiscal_print_name || r.payment_method,
-				monto: fixMoney(r.amount * order.rate_order),
-			  };
-			});
-			pagos.forEach((r) => {
-			  const p = receipt.pagos.find((f) => f.codigo == r.codigo);
-			  if (!p) {
-				receipt.pagos.push(r);
-			  } else {
-				p.monto += r.monto;
-			  }
-			});
-			//
+				const bi_igtf = order.bi_igtf || 0;
+				receipt.pagos = [];
+				// consolida por código en la impresora
+				const pagos = json.paymentlines.map((r) => {
+				  return {
+					codigo: r.fiscal_print_code || (r.dolar_active ? "20" : "01"),
+					nombre: r.fiscal_print_name || r.payment_method,
+					monto: fixMoney(r.amount * order.rate_order),
+				  };
+				});
+				pagos.forEach((r) => {
+				  const p = receipt.pagos.find((f) => f.codigo == r.codigo);
+				  if (!p) {
+					receipt.pagos.push(r);
+				  } else {
+					p.monto += r.monto;
+				  }
+				});
+				//
 
-			return receipt;
+				return receipt;
 		}
 	  //
 	  	async handleAutoPrint() {
@@ -142,7 +142,31 @@ odoo.define("3mit_print_server.print_ticket", function (require) {
 			  }
 			}
 		}
-	  	async printReceipt() {
+
+		async printNewButtonFiscal() {
+      const bfiscal = await this.validate_3mitServer();
+      if (!bfiscal) {
+        return;
+      }
+
+      $(".button.next", this.el).hide();
+
+      const isPrinted = await this._printNewButtonFiscal();
+
+      if (isPrinted) {
+        this.currentOrder._printed_fiscal = true;
+        $(".button.next", this.el).show();
+      } else {
+        $(".button.next", this.el).hide();
+      }
+    }
+
+    
+
+
+
+
+	  async printReceipt() {
 			const b3Mit = await this.validate_3mitServer();
 			if (!b3Mit) {
 			  return;

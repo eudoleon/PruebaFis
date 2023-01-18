@@ -16,7 +16,7 @@
     # Check https://github.com/odoo/odoo/blob/13.0/odoo/addons/base/data/ir_module_category_data.xml
     # for the full list
     'category': 'Sales/Point Of Sale',
-    'version': '16.0.0.0',
+    'version': '16.3.2.2',
 
     # any module necessary for this one to work correctly
     'depends':['3mit_impresora_fiscal','point_of_sale'],
@@ -42,9 +42,8 @@
         ],
         'point_of_sale.assets': [
             '3mit_print_server/static/src/js/print_ticket.js',
-        ],
-        'web.assets_qweb': [
             '3mit_print_server/static/xml/dialog.xml',
+            '3mit_print_server/static/xml/pos.xml',
         ],
     },
     'installable': True,
